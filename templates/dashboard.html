@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Дашборд</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body { 
+            font-family: sans-serif; 
+            background-color: #222; 
+            color: white; 
+        }
+        .container { margin-top: 20px; }
+        .card { margin-bottom: 20px; }
+        .product-bar { 
+            height: 10px; 
+            background-color: lightblue; 
+            display: block; 
+            max-width: 100%; /* Ограничение по ширине */
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Дашборд</h1>
+    <form method="POST">
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="date_start">Дата начала:</label>
+                <input type="date" class="form-control" id="date_start" name="date_start" value="{{ date_start }}">
+            </div>
+            <div class="form-group col-md-4">
+                <label for="date_end">Дата окончания:</label>
+                <input type="date" class="form-control" id="date_end" name="date_end" value="{{ date_end }}">
+            </div>
+            <div class="form-group col-md-2 align-self-end">
+                <button type="submit" class="btn btn-primary">Применить</button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Основные показатели -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card bg-dark text-light">
+                <div class="card-body">
+                    <h5>Доход</h5>
+                    <p>{{ total_income | round(2)}} ₽</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-dark text-light">
+                <div class="card-body">
+                    <h5>Расход</h5>
+                    <p>{{ total_expenses | round(2)}} ₽</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-dark text-light">
+                <div class="card-body">
+                    <h5>Прибыль</h5>
+                    <p>{{ total_profit | round(2)}} ₽</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ТОП продаваемых товаров и продажи по каналам сбыта -->
+    <div class="row">
+        <!-- ТОП продаваемых товаров -->
+        <div class="col-md-6 d-flex align-items-stretch">
+            <div class="card bg-dark text-light w-100">
+                <div class="card-body">
+                    <h5>ТОП продаваемых товаров</h5>
+                    {% set max_sales = top_products | map(attribute='sales') | max %} <!-- Найти максимальное значение -->
+                    {% for product in top_products %}
+                    <div>
+                        <span>{{ product.name }}: {{ product.sales }} шт.</span>
+                        <div class="product-bar" style="width: calc({{ product.sales / max_sales * 100 }}%);"></div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Продажи по каналам сбыта -->
+        <div class="col-md-6 d-flex align-items-stretch">
+            <div class="card bg-dark text-light w-100">
+                <div class="card-body">
+                    <h5>Продажи по каналам сбыта</h5>
+                    <div style="width: 100%; height: 250px;">
+                        <canvas id="salesChannelsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Результаты менеджеров -->
+    <div class="card bg-dark text-light">
+        <div class="card-body">
+            <h5>Результаты менеджеров</h5>
+            <table class="table table-striped text-light">
+                <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Сумма продаж (₽)</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for manager in managers %}
+                <tr>
+                    <td>{{ manager.name }}</td>
+                    <td>{{ manager.sales | round(2)}}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Оборачиваемость запасов -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card bg-dark text-light">
+                <div class="card-body">
+                    <h5>Оборачиваемость запасов</h5>
+                    <div style="width: 100%; height: 250px;">
+                        <canvas id="inventoryTurnoverChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Скрипты для графиков -->
+<script>
+    // Продажи по каналам сбыта
+    const salesChannelsCtx = document.getElementById('salesChannelsChart').getContext('2d');
+    new Chart(salesChannelsCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ sales_channels_labels|tojson }},
+            datasets: [{
+                data: {{ sales_channels_data|tojson }},
+                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+            }]
+        }
+    });
+
+    // Оборачиваемость запасов
+    const inventoryTurnoverCtx = document.getElementById('inventoryTurnoverChart').getContext('2d');
+    new Chart(inventoryTurnoverCtx, {
+        type: 'line',
+        data: {
+            labels: {{ inventory_turnover_labels|tojson }},
+            datasets: [{
+                label: 'Оборачиваемость',
+                data: {{ inventory_turnover_data|tojson }},
+                borderColor: '#36A2EB',
+                borderWidth: 2,
+                pointBackgroundColor: function(context) {
+                    const value = context.dataset.data[context.dataIndex];
+                    const avg = {{ average_turnover|tojson }};  // Используем переданное значение
+                    return value >= avg ? '#4CAF50' : '#FF6384'; // Зеленый или красный
+                },
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Оборачиваемость'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Месяц'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const monthIndex = context.dataIndex;
+                            const turnover = {{ inventory_turnover_data|tojson }}[monthIndex];
+                            const salesCost = {{ sales_cost_data|tojson }}[monthIndex];
+                            const avgInventory = {{ average_inventory_data|tojson }}[monthIndex];
+                            return [
+                                `Оборачиваемость: ${turnover}`,
+                                `Себестоимость: ${salesCost.toLocaleString()} ₽`,
+                                `Средний остаток: ${avgInventory.toLocaleString()}`
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>
